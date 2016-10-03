@@ -47,7 +47,7 @@ void AddNode(int pid, char* cmd, int isRunning) {
     newNode->pid = pid;
     newNode->isRunning = isRunning;
     newNode->next = NULL;
-    newNode->cmd = cmd;
+    newNode->cmd = strdup(cmd);
 
     if (head == NULL) {
         head = newNode;
@@ -60,19 +60,22 @@ void AddNode(int pid, char* cmd, int isRunning) {
 }
 
 void RemoveNode(int pid) {
-    //THIS IS BROKEN maybe
-    node* curr = NULL;
-    node* lookAhead = head;
-    while(lookAhead->pid != pid) {
-        if (!lookAhead) {
-            //It doesn't exist
-            printf("pid %d does not exist or was not started by Pman\n", pid);
+    if (head == NULL) return;
+    node* prev = NULL;
+    node* cur = head;
+
+    while(cur->pid != pid) {
+        if (cur->next == NULL) {
+            printf("pid %d does not exist in Pman.\n", pid);
+            return;
         }
-        curr = curr->next;
-        lookAhead = lookAhead->next;
+        prev = cur->next;
+        cur = cur->next;
     }
-    if (lookAhead == head) head = lookAhead->next;
-    if (curr != NULL) curr->next = lookAhead->next;
+
+    if (cur == head) head = cur->next;
+    if (prev != NULL) prev->next = cur->next;
+    free(cur);
 }
 
 node* FindNode(int pid) {
