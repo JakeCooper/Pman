@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <errno.h>
+#include <dirent.h>
 #include <unistd.h>
 #include <ctype.h>
 #include <string.h>
@@ -148,9 +150,21 @@ void PrintStat(int pid) {
     char* token = " ";
     char statBuffer[1000];
     char statusBuffer[1000];
+    char dirBuffer[1000];
     int nonvoluntary, voluntary;
 
-    if (!FindNode(pid)) return;
+    sprintf(dirBuffer, "/proc/%d", pid);
+    DIR* dir = opendir(dirBuffer);
+
+    if (!dir) {
+        //Directory does not exist, and therefore the process.
+        if (ENOENT == errno) {
+            printf("Process %d does not exist.\n", pid);
+        } else {
+            printf("Process %d is unaccessible.\n", pid);
+        }
+        return;
+    }
 
     //status
     sprintf(statusBuffer, "/proc/%d/status", pid);
@@ -163,7 +177,6 @@ void PrintStat(int pid) {
 
     //stat
     sprintf(statBuffer, "/proc/%d/stat", pid);
-    printf("%s place\n", statBuffer);
     statfp = fopen(statBuffer, "r");
     if (statfp == NULL)
         printf("Could not open proc for pid %d", pid);
