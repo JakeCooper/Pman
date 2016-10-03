@@ -182,8 +182,8 @@ void PrintStat(int pid) {
     printf("pstat for pid %s\n", stat[0]);
     printf("comm: %s\n", stat[1]);
     printf("state: %s\n", stat[2]);
-    printf("utime: %s\n", stat[13]);
-    printf("stime: %s\n", stat[14]);
+    printf("utime: %ld\n", atoi(stat[13])/sysconf(_SC_CLK_TCK));
+    printf("stime: %ld\n", atoi(stat[14])/sysconf(_SC_CLK_TCK));
     printf("rss: %s\n", stat[23]);
     printf("voluntary_ctxt_switches: %d\n", voluntary);
     printf("nonvoluntary_ctxt_switches: %d\n", nonvoluntary);
