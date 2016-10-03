@@ -9,6 +9,8 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
+const int bufferSize = 1000;
+
 typedef struct node {
     int pid;
     int isRunning;
@@ -17,7 +19,6 @@ typedef struct node {
 } node;
 
 node* head = NULL;
-
 
 void KillProcess(int pid) {
     if (kill(pid, SIGKILL)) {
@@ -108,13 +109,14 @@ void updateBackgroundProcess() {
     int status;
     int pid = waitpid(-1, &status, WNOHANG|WUNTRACED|WCONTINUED);
     if (pid > 0) {
-        printf("pid %d change with status %d\n", pid, status);
+        printf("pid %d changed with status %d\n", pid, status);
         if (WIFCONTINUED(status)) {
             //Continued
             //status 65535
             node* myNode = FindNode(pid);
             if (myNode) {
                 myNode->isRunning = 1;
+                printf("%d : Started\n", pid);
             }
         } else if (WIFSTOPPED(status)) {
             //Stopped
@@ -122,36 +124,47 @@ void updateBackgroundProcess() {
             node* myNode = FindNode(pid);
             if (myNode) {
                 myNode->isRunning = 0;
+                printf("%d : Stopped\n", pid);
             }
         } else if (WIFEXITED(status)) {
             //Finished
             //status 256
             RemoveNode(pid);
+            printf("%d : Finished\n", pid);
             //Remove it from the linkedList
         } else if (WIFSIGNALED(status)) {
             //Killed (RIP Harambe)
             //status 9
             RemoveNode(pid);
+            printf("%d : Killed\n", pid);
             //Remove it from the linkedList
         }
     }
 }
 
+void splitOn(char* token, char contents[], char* result[]) {
+    char* iterToken = strtok(contents, token);
+    int i = 0;
+    while (iterToken != NULL) {
+        result[i] = strdup(iterToken);
+        iterToken = strtok(NULL, token);
+        i++;
+    }
+}
+
 void PrintStat(int pid) {
-    FILE * statfp;
-    FILE * statusfp;
-    char line[10000];
-    size_t len = 0;
-    ssize_t read;
-    char *stat[1024];
-    char status[50][256];
+    FILE* statfp;
+    FILE* statusfp;
+    char line[bufferSize];
+    char* stat[bufferSize];
+    char status[50][bufferSize];
+    char* token = " ";
+    char statBuffer[bufferSize];
+    char statusBuffer[bufferSize];
+    char dirBuffer[bufferSize];
+    int nonvoluntary, voluntary;
     int i = 0;
     int j = 0;
-    char* token = " ";
-    char statBuffer[1000];
-    char statusBuffer[1000];
-    char dirBuffer[1000];
-    int nonvoluntary, voluntary;
 
     sprintf(dirBuffer, "/proc/%d", pid);
     DIR* dir = opendir(dirBuffer);
@@ -178,20 +191,16 @@ void PrintStat(int pid) {
     //stat
     sprintf(statBuffer, "/proc/%d/stat", pid);
     statfp = fopen(statBuffer, "r");
-    if (statfp == NULL)
-        printf("Could not open proc for pid %d", pid);
+
+    if (statfp == NULL) printf("Could not open proc for pid %d", pid);
 
     fgets(line, sizeof(line), statfp) != NULL;
 
-    char* iterToken = strtok(line, token);
-    while (iterToken != NULL) {
-        stat[i] = strdup(iterToken);
-        iterToken = strtok(NULL, token);
-        i++;
-    }
+    splitOn(token, line, stat);
 
     fclose(statfp);
     fclose(statusfp);
+
     printf("pstat for pid %s\n", stat[0]);
     printf("comm: %s\n", stat[1]);
     printf("state: %s\n", stat[2]);
@@ -200,90 +209,6 @@ void PrintStat(int pid) {
     printf("rss: %s\n", stat[23]);
     printf("voluntary_ctxt_switches: %d\n", voluntary);
     printf("nonvoluntary_ctxt_switches: %d\n", nonvoluntary);
-}
-
-int main(){
-    int id;
-    int i;
-    int j;
-    int cp;
-    char *token = " ";
-    char *prompt = "your command: ";
-    while (1) {
-        updateBackgroundProcess();
-        char *input = NULL ;
-
-        char *iterToken;
-        char *args[256];
-        char str[1000];
-        i = 0;
-        cp = 0;
-        input = readline(prompt);
-        if (!strcmp(input,"")) continue;
-
-        iterToken = strtok(input, token);
-        while (iterToken != NULL) {
-            args[i] = iterToken;
-            iterToken = strtok(NULL, token);
-            i++;
-        }
-        for (j = i; j < 256; j++) {
-            //Clear out old args
-            args[j] = NULL;
-        }
-
-        if (strcmp(args[0], "exit") == 0) {
-            printf("Exiting\n");
-            break;
-        } else  if (strcmp(args[0], "bg") == 0) {
-            if (!args[1]) {
-                printf("No job specified\n");
-            } else {
-                int id = fork();
-                strcpy(str, "");
-                for (cp = 1; cp < i; cp++) {
-                    strcat(str, args[cp]);
-                    strcat(str, " ");
-                }
-                if ( id == 0 ) {
-                    //Child Process
-                    execvp(args[1], &args[1]);
-                    printf("Failed to perform action %s\n", str);
-                    exit(1);
-                } else if ( id > 0) {
-                    //Parent Process
-                    printf("Adding node with id %d and cmd %s\n", id, str);
-                    AddNode(id, str, 1);
-                    sleep(1);
-                } else {
-                    //forking failed, join the dark side.
-                    printf("Forking Failed");
-                }
-            }
-        } else if (strcmp(args[0], "bglist") == 0) {
-            PrintLinkedList();
-        } else if (strcmp(args[0], "bgkill") == 0) {
-            if (verifyInput(args[1])) {
-                KillProcess(atoi(args[1]));
-            }
-        } else if (strcmp(args[0], "bgstop") == 0) {
-            if (verifyInput(args[1])) {
-                StopProcess(atoi(args[1]));
-            }
-        } else if (strcmp(args[0], "bgstart") == 0) {
-            if (verifyInput(args[1])) {
-                StartProcess(atoi(args[1]));
-            }
-        } else if (strcmp(args[0], "pstat") == 0) {
-            if (verifyInput(args[1])) {
-                PrintStat(atoi(args[1]));
-            }
-        } else {
-            printf("%s: command not found\n", args[0]);
-        }
-        updateBackgroundProcess();
-    }
-    return 1;
 }
 
 int verifyInput(char input[]) {
@@ -309,3 +234,85 @@ int isDigit(char input[]) {
     return 1;
 }
 
+void processInput(char* args[], int arglength) {
+    int cp;
+    char str[1000];
+    if (strcmp(args[0], "exit") == 0) {
+        printf("Exiting\n");
+        exit(1);
+    } else  if (strcmp(args[0], "bg") == 0) {
+        if (!args[1]) {
+            printf("No job specified\n");
+        } else {
+            int id = fork();
+            strcpy(str, "");
+            for (cp = 1; cp < arglength; cp++) {
+                strcat(str, args[cp]);
+                strcat(str, " ");
+            }
+            if ( id == 0 ) {
+                //Child Process
+                execvp(args[1], &args[1]);
+                printf("Failed to perform action %s\n", str);
+                exit(1);
+            } else if ( id > 0) {
+                //Parent Process
+                printf("Adding node with id %d and cmd %s\n", id, str);
+                AddNode(id, str, 1);
+                sleep(1);
+            } else {
+                //forking failed, join the dark side.
+                printf("Forking Failed");
+            }
+        }
+    } else if (strcmp(args[0], "bglist") == 0) {
+        PrintLinkedList();
+    } else if (strcmp(args[0], "bgkill") == 0) {
+        if (verifyInput(args[1])) {
+            KillProcess(atoi(args[1]));
+        }
+    } else if (strcmp(args[0], "bgstop") == 0) {
+        if (verifyInput(args[1])) {
+            StopProcess(atoi(args[1]));
+        }
+    } else if (strcmp(args[0], "bgstart") == 0) {
+        if (verifyInput(args[1])) {
+            StartProcess(atoi(args[1]));
+        }
+    } else if (strcmp(args[0], "pstat") == 0) {
+        if (verifyInput(args[1])) {
+            PrintStat(atoi(args[1]));
+        }
+    } else {
+        printf("%s: command not found\n", args[0]);
+    }
+}
+
+int main(){
+    int i,j;
+    char *token = " ";
+    char *prompt = "your command: ";
+    const int maxArgs = 100;
+    while (1) {
+        i = 0;
+        char *input = NULL ;
+        char *iterToken;
+        char *args[maxArgs];
+
+
+        updateBackgroundProcess();
+        input = readline(prompt);
+
+        if (!strcmp(input,"")) continue;
+
+        iterToken = strtok(input, token);
+        for (j = 0; j < maxArgs; j++) {
+            if (iterToken) i++;
+            args[j] = iterToken;
+            iterToken = strtok(NULL, token);
+        }
+
+        processInput(args, i);
+        updateBackgroundProcess();
+    }
+}
