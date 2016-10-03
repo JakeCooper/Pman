@@ -20,6 +20,7 @@ typedef struct node {
 
 node* head = NULL;
 
+//Utility function for killing a process.
 void KillProcess(int pid) {
     if (kill(pid, SIGKILL)) {
         printf("Failed to kill process %d\n", pid);
@@ -28,6 +29,7 @@ void KillProcess(int pid) {
     }
 }
 
+//Utility function for stoppping a process.
 void StopProcess(int pid) {
     if (kill(pid, SIGSTOP)) {
         printf("Failed to stop process %d\n", pid);
@@ -36,6 +38,7 @@ void StopProcess(int pid) {
     }
 }
 
+//Utility function for starting a process.
 void StartProcess(int pid) {
     if (kill(pid, SIGCONT)) {
         printf("Failed to start process %d\n", pid);
@@ -44,7 +47,7 @@ void StartProcess(int pid) {
     }
 }
 
-
+//Utility function for adding a node to the linked list.
 void AddNode(int pid, char* cmd, int isRunning) {
     node* newNode = malloc (sizeof(node));
     newNode->pid = pid;
@@ -62,6 +65,7 @@ void AddNode(int pid, char* cmd, int isRunning) {
 
 }
 
+//Utility function for removing a node from the linked list.
 void RemoveNode(int pid) {
     if (head == NULL) return;
     node* prev = NULL;
@@ -81,6 +85,8 @@ void RemoveNode(int pid) {
     free(cur);
 }
 
+
+//Utility function for finding a node in the linked list.
 node* FindNode(int pid) {
     node* curr = head;
     while (curr == NULL || curr->pid != pid) {
@@ -93,6 +99,7 @@ node* FindNode(int pid) {
     return curr;
 }
 
+//Prints the linked list
 void PrintLinkedList() {
     node* curr = head;
     int numProcesses = 0;
@@ -105,6 +112,7 @@ void PrintLinkedList() {
 
 }
 
+//Called to update the background process, cleaning up or adding to the linked list.
 void updateBackgroundProcess() {
     int status;
     int pid = waitpid(-1, &status, WNOHANG|WUNTRACED|WCONTINUED);
@@ -142,6 +150,7 @@ void updateBackgroundProcess() {
     }
 }
 
+//split on a given token and pass the result back through result
 void splitOn(char* token, char contents[], char* result[]) {
     char* iterToken = strtok(contents, token);
     int i = 0;
@@ -152,6 +161,7 @@ void splitOn(char* token, char contents[], char* result[]) {
     }
 }
 
+//implementation of pstat
 void PrintStat(int pid) {
     FILE* statfp;
     FILE* statusfp;
@@ -211,6 +221,7 @@ void PrintStat(int pid) {
     printf("nonvoluntary_ctxt_switches: %d\n", nonvoluntary);
 }
 
+//Verify that command input meets usage spec.
 int verifyInput(char input[]) {
     if (!input) {
         printf("No job specified\n");
@@ -223,6 +234,7 @@ int verifyInput(char input[]) {
     }
 }
 
+//Utility function for determining if a string is a digit.
 int isDigit(char input[]) {
     int length = strlen(input);
     int i;
@@ -234,6 +246,7 @@ int isDigit(char input[]) {
     return 1;
 }
 
+//Function for processing the user input.
 void processInput(char* args[], int arglength) {
     int cp;
     char str[1000];
