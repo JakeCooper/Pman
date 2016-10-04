@@ -178,7 +178,7 @@ void printStat(int pid) {
     char statBuffer[bufferSize];
     char statusBuffer[bufferSize];
     char dirBuffer[bufferSize];
-    int nonvoluntary, voluntary;
+    long int nonvoluntary, voluntary;
     int i = 0;
     int j = 0;
 
@@ -203,8 +203,8 @@ void printStat(int pid) {
         j++;
     }
 
-    sscanf(status[j - 2], "voluntary_ctxt_switches: %d", &voluntary);
-    sscanf(status[j - 1], "nonvoluntary_ctxt_switches: %d", &nonvoluntary);
+    sscanf(status[j - 2], "voluntary_ctxt_switches: %ld", &voluntary);
+    sscanf(status[j - 1], "nonvoluntary_ctxt_switches: %ld", &nonvoluntary);
 
     //stat
     sprintf(statBuffer, "/proc/%d/stat", pid);
@@ -227,8 +227,8 @@ void printStat(int pid) {
     printf("utime: %ld\n", atoi(stat[13])/sysconf(_SC_CLK_TCK));
     printf("stime: %ld\n", atoi(stat[14])/sysconf(_SC_CLK_TCK));
     printf("rss: %s\n", stat[23]);
-    printf("voluntary_ctxt_switches: %d\n", voluntary);
-    printf("nonvoluntary_ctxt_switches: %d\n", nonvoluntary);
+    printf("voluntary_ctxt_switches: %ld\n", voluntary);
+    printf("nonvoluntary_ctxt_switches: %ld\n", nonvoluntary);
 }
 
 //Verify that command input meets usage spec.
