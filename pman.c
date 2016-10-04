@@ -271,7 +271,7 @@ void processInput(char* args[], int arglength) {
         } else {
             int id = fork();
             strcpy(str, "");
-            *failed = 0;
+            *failed = 0; //set fork communication to not failed
             for (cp = 1; cp < arglength; cp++) {
                 strcat(str, args[cp]);
                 strcat(str, " ");
@@ -280,12 +280,13 @@ void processInput(char* args[], int arglength) {
                 //Child Process
                 execvp(args[1], &args[1]);
                 printf("Failed to perform action %s\n", str);
-                *failed = 1;
-                exit(1);
+                *failed = 1; //set fork failed flag to be read in parent
+                exit(1); //exit so we don't have two pmen
             } else if ( id > 0) {
                 //Parent Process
                 usleep(sleepTime);
                 if (*failed == 0) {
+                    //if the child failed to load
                     printf("Process created with id %d\n", id);
                     addNode(id, str, 1);
                 }
@@ -332,7 +333,7 @@ int main(){
                     MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     while (1) {
         i = 0; //reset i so you can write over args
-        char *input = NULL ;
+        char *input = NULL;
         char *iterToken;
         char *args[maxArgs];
 
@@ -354,6 +355,6 @@ int main(){
 
         processInput(args, i);
         usleep(sleepTime);
-        updateBackgroundProcess(); //update bglist
+        updateBackgroundProcess(); //update bglist again
     }
 }
