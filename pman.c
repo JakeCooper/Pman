@@ -23,27 +23,6 @@ typedef struct node {
 
 node* head = NULL;
 
-//Utility function for killing a process.
-void killProcess(int pid) {
-    if (kill(pid, SIGTERM)) {
-        printf("Failed to kill process %d\n", pid);
-    }
-}
-
-//Utility function for stoppping a process.
-void stopProcess(int pid) {
-    if (kill(pid, SIGSTOP)) {
-        printf("Failed to stop process %d\n", pid);
-    }
-}
-
-//Utility function for starting a process.
-void startProcess(int pid) {
-    if (kill(pid, SIGCONT)) {
-        printf("Failed to start process %d\n", pid);
-    }
-}
-
 //Utility function for adding a node to the linked list.
 void addNode(int pid, char* cmd, int isRunning) {
     node* newNode = malloc (sizeof(node));
@@ -98,12 +77,58 @@ node* findNode(int pid) {
     while (curr == NULL || curr->pid != pid) {
         if (curr == NULL) {
             //Not in list
-            printf("pid %d does not exist or was not started by Pman\n", pid);
             break;
         }
         curr = curr->next;
     }
     return curr;
+}
+
+int processExists(pid) {
+    char dirBuffer[bufferSize];
+    sprintf(dirBuffer, "/proc/%d", pid);
+    DIR* dir = opendir(dirBuffer);
+
+    if (!dir) {
+        //Directory does not exist, and therefore the process.
+        if (ENOENT == errno) {
+            printf("Process %d does not exist.\n", pid);
+        } else {
+            printf("Process %d is unaccessible.\n", pid);
+        }
+        return 0;
+    }
+    return 1;
+}
+
+//Utility function for stoppping a process.
+void stopProcess(int pid) {
+    if (!processExists()) return;
+    if (kill(pid, SIGSTOP)) {
+        printf("Failed to stop process %d\n", pid);
+    }
+}
+
+//Utility function for starting a process.
+void startProcess(int pid) {
+    if (!processExists()) return;
+    if (kill(pid, SIGCONT)) {
+        printf("Failed to start process %d\n", pid);
+    }
+}
+
+//Utility function for killing a process.
+void killProcess(int pid) {
+    if (!processExists()) return;
+    node* myNode = findNode(pid);
+    if (myNode && myNode->isRunning == 0) {
+        printf("Restarting process %d to safekill it\n", pid);
+        startProcess(pid);
+    }
+    usleep(sleepTime);
+    if (kill(pid, SIGTERM)) {
+        printf("Failed to terminate process %d\n", pid);
+    }
 }
 
 //Prints the linked list
@@ -177,24 +202,11 @@ void printStat(int pid) {
     char* token = " ";
     char statBuffer[bufferSize];
     char statusBuffer[bufferSize];
-    char dirBuffer[bufferSize];
     long int nonvoluntary, voluntary;
     int i = 0;
     int j = 0;
 
-    sprintf(dirBuffer, "/proc/%d", pid);
-    DIR* dir = opendir(dirBuffer);
-
-    if (!dir) {
-        //Directory does not exist, and therefore the process.
-        if (ENOENT == errno) {
-            printf("Process %d does not exist.\n", pid);
-        } else {
-            printf("Process %d is unaccessible.\n", pid);
-        }
-        return;
-    }
-
+    if (!processExists(pid)) return;
     //status
     sprintf(statusBuffer, "/proc/%d/status", pid);
     statusfp = fopen(statusBuffer, "r");
