@@ -11,7 +11,7 @@
 #include <readline/history.h>
 
 const int bufferSize = 1000;
-const int sleepTime = 1000;
+const int sleepTime = 10000;
 int *failed; //Pointer for communicating between forks.
 
 typedef struct node {
