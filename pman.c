@@ -249,7 +249,7 @@ int verifyInput(char input[]) {
         printf("No job specified\n");
         return 0;
     } else if (!isDigit(input)) {
-        printf("Pid must be an integer\n");
+        printf("error: pid must be an integer\n");
         return 0;
     } else {
         return 1;
