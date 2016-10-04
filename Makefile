@@ -2,7 +2,7 @@
 all: pman
 
 pman: pman.c
-	gcc pman.c -lreadline -lhistory -o rsi
+	gcc pman.c -lreadline -lhistory -o pman
 
 .PHONY clean:
 	clean:
