@@ -6,10 +6,13 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
 const int bufferSize = 1000;
+const int sleepTime = 1000;
+int *failed; //Pointer for communicating between forks.
 
 typedef struct node {
     int pid;
@@ -21,34 +24,28 @@ typedef struct node {
 node* head = NULL;
 
 //Utility function for killing a process.
-void KillProcess(int pid) {
-    if (kill(pid, SIGKILL)) {
+void killProcess(int pid) {
+    if (kill(pid, SIGTERM)) {
         printf("Failed to kill process %d\n", pid);
-    } else {
-        printf("Successfully killed process %d\n", pid);
     }
 }
 
 //Utility function for stoppping a process.
-void StopProcess(int pid) {
+void stopProcess(int pid) {
     if (kill(pid, SIGSTOP)) {
         printf("Failed to stop process %d\n", pid);
-    } else {
-        printf("Successfully stopped process %d\n", pid);
     }
 }
 
 //Utility function for starting a process.
-void StartProcess(int pid) {
+void startProcess(int pid) {
     if (kill(pid, SIGCONT)) {
         printf("Failed to start process %d\n", pid);
-    } else {
-        printf("Successfully started process %d\n", pid);
     }
 }
 
 //Utility function for adding a node to the linked list.
-void AddNode(int pid, char* cmd, int isRunning) {
+void addNode(int pid, char* cmd, int isRunning) {
     node* newNode = malloc (sizeof(node));
     newNode->pid = pid;
     newNode->isRunning = isRunning;
@@ -56,41 +53,51 @@ void AddNode(int pid, char* cmd, int isRunning) {
     newNode->cmd = strdup(cmd);
 
     if (head == NULL) {
+        //empty linkedlist
         head = newNode;
         return;
     }
     node *curr = head;
-    while(curr->next != NULL) curr = curr->next;
-    curr->next = newNode;
+    while(curr->next != NULL) {
+        curr = curr->next;
+        //traverse
+    }
+    curr->next = newNode; //Set new node
 
 }
 
 //Utility function for removing a node from the linked list.
-void RemoveNode(int pid) {
-    if (head == NULL) return;
+void removeNode(int pid) {
+    if (head == NULL) return; //Nolist case
     node* prev = NULL;
-    node* cur = head;
+    node* curr = head;
 
-    while(cur->pid != pid) {
-        if (cur->next == NULL) {
-            printf("pid %d does not exist in Pman.\n", pid);
+    while(curr == NULL || curr->pid != pid) {
+        if (curr == NULL) {
+            //pid not in linkedlist
             return;
         }
-        prev = cur->next;
-        cur = cur->next;
+        prev = curr; //iter
+        curr = curr->next; //iter
     }
 
-    if (cur == head) head = cur->next;
-    if (prev != NULL) prev->next = cur->next;
-    free(cur);
+    if (curr == head) {
+        //firstElem
+        head = curr->next;
+    }
+    if (prev != NULL) {
+        //Not first element
+        prev->next = curr->next;
+    }
 }
 
 
 //Utility function for finding a node in the linked list.
-node* FindNode(int pid) {
+node* findNode(int pid) {
     node* curr = head;
     while (curr == NULL || curr->pid != pid) {
         if (curr == NULL) {
+            //Not in list
             printf("pid %d does not exist or was not started by Pman\n", pid);
             break;
         }
@@ -100,7 +107,7 @@ node* FindNode(int pid) {
 }
 
 //Prints the linked list
-void PrintLinkedList() {
+void printLinkedList() {
     node* curr = head;
     int numProcesses = 0;
     while(curr != NULL) {
@@ -117,34 +124,33 @@ void updateBackgroundProcess() {
     int status;
     int pid = waitpid(-1, &status, WNOHANG|WUNTRACED|WCONTINUED);
     if (pid > 0) {
-        printf("pid %d changed with status %d\n", pid, status);
         if (WIFCONTINUED(status)) {
             //Continued
             //status 65535
-            node* myNode = FindNode(pid);
+            node* myNode = findNode(pid);
             if (myNode) {
                 myNode->isRunning = 1;
-                printf("%d : Started\n", pid);
             }
+            printf("%d : Started\n", pid);
         } else if (WIFSTOPPED(status)) {
             //Stopped
             //status 4991
-            node* myNode = FindNode(pid);
+            node* myNode = findNode(pid);
             if (myNode) {
                 myNode->isRunning = 0;
-                printf("%d : Stopped\n", pid);
             }
+            printf("%d : Stopped\n", pid);
         } else if (WIFEXITED(status)) {
             //Finished
             //status 256
-            RemoveNode(pid);
+            removeNode(pid);
             printf("%d : Finished\n", pid);
             //Remove it from the linkedList
         } else if (WIFSIGNALED(status)) {
             //Killed (RIP Harambe)
             //status 9
-            RemoveNode(pid);
-            printf("%d : Killed\n", pid);
+            removeNode(pid);
+            printf("%d : Terminated\n", pid);
             //Remove it from the linkedList
         }
     }
@@ -162,7 +168,7 @@ void splitOn(char* token, char contents[], char* result[]) {
 }
 
 //implementation of pstat
-void PrintStat(int pid) {
+void printStat(int pid) {
     FILE* statfp;
     FILE* statusfp;
     char line[bufferSize];
@@ -193,7 +199,9 @@ void PrintStat(int pid) {
     sprintf(statusBuffer, "/proc/%d/status", pid);
     statusfp = fopen(statusBuffer, "r");
 
-    while (fgets(status[j], 256, statusfp) != NULL) j++;
+    while (fgets(status[j], 256, statusfp) != NULL) {
+        j++;
+    }
 
     sscanf(status[j - 2], "voluntary_ctxt_switches: %d", &voluntary);
     sscanf(status[j - 1], "nonvoluntary_ctxt_switches: %d", &nonvoluntary);
@@ -202,7 +210,9 @@ void PrintStat(int pid) {
     sprintf(statBuffer, "/proc/%d/stat", pid);
     statfp = fopen(statBuffer, "r");
 
-    if (statfp == NULL) printf("Could not open proc for pid %d", pid);
+    if (statfp == NULL) {
+        printf("Could not open proc for pid %d", pid);
+    }
 
     fgets(line, sizeof(line), statfp) != NULL;
 
@@ -249,16 +259,19 @@ int isDigit(char input[]) {
 //Function for processing the user input.
 void processInput(char* args[], int arglength) {
     int cp;
-    char str[1000];
+    char str[bufferSize];
     if (strcmp(args[0], "exit") == 0) {
+        //exit
         printf("Exiting\n");
         exit(1);
     } else  if (strcmp(args[0], "bg") == 0) {
+        //bg <cmd>
         if (!args[1]) {
             printf("No job specified\n");
         } else {
             int id = fork();
             strcpy(str, "");
+            *failed = 0;
             for (cp = 1; cp < arglength; cp++) {
                 strcat(str, args[cp]);
                 strcat(str, " ");
@@ -267,34 +280,43 @@ void processInput(char* args[], int arglength) {
                 //Child Process
                 execvp(args[1], &args[1]);
                 printf("Failed to perform action %s\n", str);
+                *failed = 1;
                 exit(1);
             } else if ( id > 0) {
                 //Parent Process
-                printf("Adding node with id %d and cmd %s\n", id, str);
-                AddNode(id, str, 1);
-                sleep(1);
+                usleep(sleepTime);
+                if (*failed == 0) {
+                    printf("Process created with id %d\n", id);
+                    addNode(id, str, 1);
+                }
+                usleep(sleepTime);
             } else {
                 //forking failed, join the dark side.
                 printf("Forking Failed");
             }
         }
     } else if (strcmp(args[0], "bglist") == 0) {
-        PrintLinkedList();
+        //bglist <pid>
+        printLinkedList();
     } else if (strcmp(args[0], "bgkill") == 0) {
+        //bgkill <pid>
         if (verifyInput(args[1])) {
-            KillProcess(atoi(args[1]));
+            killProcess(atoi(args[1]));
         }
     } else if (strcmp(args[0], "bgstop") == 0) {
+        //bgstop <pid>
         if (verifyInput(args[1])) {
-            StopProcess(atoi(args[1]));
+            stopProcess(atoi(args[1]));
         }
     } else if (strcmp(args[0], "bgstart") == 0) {
+        //bgstart <pid>
         if (verifyInput(args[1])) {
-            StartProcess(atoi(args[1]));
+            startProcess(atoi(args[1]));
         }
     } else if (strcmp(args[0], "pstat") == 0) {
+        //pstat <pid>
         if (verifyInput(args[1])) {
-            PrintStat(atoi(args[1]));
+            printStat(atoi(args[1]));
         }
     } else {
         printf("%s: command not found\n", args[0]);
@@ -306,26 +328,32 @@ int main(){
     char *token = " ";
     char *prompt = "your command: ";
     const int maxArgs = 100;
+    failed = mmap(NULL, sizeof *failed, PROT_READ | PROT_WRITE,
+                    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     while (1) {
-        i = 0;
+        i = 0; //reset i so you can write over args
         char *input = NULL ;
         char *iterToken;
         char *args[maxArgs];
 
 
-        updateBackgroundProcess();
+        updateBackgroundProcess(); //update bglist
         input = readline(prompt);
 
-        if (!strcmp(input,"")) continue;
+        if (!strcmp(input,"")) {
+            //invalid input
+            continue;
+        }
 
         iterToken = strtok(input, token);
         for (j = 0; j < maxArgs; j++) {
-            if (iterToken) i++;
-            args[j] = iterToken;
-            iterToken = strtok(NULL, token);
+            if (iterToken) i++; //track how many args
+            args[j] = iterToken; //Grab tokens (or nulls to clear)
+            iterToken = strtok(NULL, token); //nextToken
         }
 
         processInput(args, i);
-        updateBackgroundProcess();
+        usleep(sleepTime);
+        updateBackgroundProcess(); //update bglist
     }
 }
