@@ -352,6 +352,7 @@ int main(){
 
         updateBackgroundProcess(); //update bglist
         input = readline(prompt);
+        printf("\n");
 
         if (!strcmp(input,"")) {
             //invalid input
@@ -368,5 +369,6 @@ int main(){
         processInput(args, i);
         usleep(sleepTime);
         updateBackgroundProcess(); //update bglist again
+        printf("\n");
     }
 }
