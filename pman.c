@@ -92,9 +92,9 @@ int processExists(pid) {
     if (!dir) {
         //Directory does not exist, and therefore the process.
         if (ENOENT == errno) {
-            printf("Process %d does not exist.\n", pid);
+            printf("Error: Process %d does not exist.\n", pid);
         } else {
-            printf("Process %d is unaccessible.\n", pid);
+            printf("Error: Process %d is unaccessible.\n", pid);
         }
         return 0;
     }
@@ -105,7 +105,7 @@ int processExists(pid) {
 void stopProcess(int pid) {
     if (!processExists()) return;
     if (kill(pid, SIGSTOP)) {
-        printf("Failed to stop process %d\n", pid);
+        printf("Error: Failed to stop process %d\n", pid);
     }
 }
 
@@ -113,7 +113,7 @@ void stopProcess(int pid) {
 void startProcess(int pid) {
     if (!processExists()) return;
     if (kill(pid, SIGCONT)) {
-        printf("Failed to start process %d\n", pid);
+        printf("Error: Failed to start process %d\n", pid);
     }
 }
 
@@ -127,7 +127,7 @@ void killProcess(int pid) {
     }
     usleep(sleepTime);
     if (kill(pid, SIGTERM)) {
-        printf("Failed to terminate process %d\n", pid);
+        printf("Error: Failed to terminate process %d\n", pid);
     }
 }
 
@@ -223,7 +223,7 @@ void printStat(int pid) {
     statfp = fopen(statBuffer, "r");
 
     if (statfp == NULL) {
-        printf("Could not open proc for pid %d", pid);
+        printf("Error: Could not open proc for pid %d", pid);
     }
 
     fgets(line, sizeof(line), statfp) != NULL;
@@ -249,7 +249,7 @@ int verifyInput(char input[]) {
         printf("No job specified\n");
         return 0;
     } else if (!isDigit(input)) {
-        printf("error: pid must be an integer\n");
+        printf("Error: pid must be an integer\n");
         return 0;
     } else {
         return 1;
@@ -279,7 +279,7 @@ void processInput(char* args[], int arglength) {
     } else  if (strcmp(args[0], "bg") == 0) {
         //bg <cmd>
         if (!args[1]) {
-            printf("No job specified\n");
+            printf("Error: No command specified\n");
         } else {
             int id = fork();
             strcpy(str, "");
@@ -291,7 +291,7 @@ void processInput(char* args[], int arglength) {
             if ( id == 0 ) {
                 //Child Process
                 execvp(args[1], &args[1]);
-                printf("Failed to perform action %s\n", str);
+                printf("Error: Failed to perform action %s\n", str);
                 *failed = 1; //set fork failed flag to be read in parent
                 exit(1); //exit so we don't have two pmen
             } else if ( id > 0) {
@@ -305,7 +305,7 @@ void processInput(char* args[], int arglength) {
                 usleep(sleepTime);
             } else {
                 //forking failed, join the dark side.
-                printf("Forking Failed");
+                printf("Error: Forking Failed");
             }
         }
     } else if (strcmp(args[0], "bglist") == 0) {
